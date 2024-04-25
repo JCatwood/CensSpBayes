@@ -52,7 +52,7 @@ CensSpBayes <- function(Y, S, X, cutoff.Y, S.pred, X.pred, inla.mats, alpha = 2,
                     tau.a = 0.1, tau.b = 0.1,
                     rho.upper = NULL,
                     # mcmc settings
-                    iters = 4000, burn = 2000, thin = 5){
+                    iters = 4000, burn = 2000, thin = 5, ret_samp = FALSE){
 
   tick <- proc.time()[3]
 
@@ -125,6 +125,10 @@ CensSpBayes <- function(Y, S, X, cutoff.Y, S.pred, X.pred, inla.mats, alpha = 2,
   if(jitter > 0){r <- jitter(r); rho <- jitter(rho); tau <- jitter(tau); theta <- jitter(theta)}
 
   return.iters <- (burn + 1):iters
+  
+  if (ret_samp) {
+    samp <- matrix(NA, nrow = np, ncol = length(return.iters))
+  }
 
   for(iter in 1:iters){for(ttt in 1:thin){
     theta.latent <- theta.latent.update(nq, nmesh, crossprod.X, crossprod.A,
@@ -182,6 +186,9 @@ CensSpBayes <- function(Y, S, X, cutoff.Y, S.pred, X.pred, inla.mats, alpha = 2,
 
       Y.pred.sum <- Y.pred.sum + Y.pred
       Y.pred2.sum <- Y.pred2.sum + Y.pred^2
+      if (ret_samp) {
+        samp[, iter - burn] <- Y.pred
+      }
     }
 
     # storage
@@ -199,16 +206,30 @@ CensSpBayes <- function(Y, S, X, cutoff.Y, S.pred, X.pred, inla.mats, alpha = 2,
   Y.pred.posvar <- Y.pred2.sum / length(return.iters) - Y.pred.posmean^2
 
   tock <- proc.time()[3]
-
-  results <- list(theta = keepers.theta,
-                  tau = keepers.tau,
-                  rho = keepers.rho,
-                  r = keepers.r,
-                  latent.posmean = latent.posmean,
-                  latent.posvar = latent.posvar,
-                  Y.pred.posmean = Y.pred.posmean,
-                  Y.pred.posvar = Y.pred.posvar,
-                  minutes = (tock - tick) / 60
-  )
+  
+  if (ret_samp) {
+    results <- list(theta = keepers.theta,
+                    tau = keepers.tau,
+                    rho = keepers.rho,
+                    r = keepers.r,
+                    latent.posmean = latent.posmean,
+                    latent.posvar = latent.posvar,
+                    Y.pred.posmean = Y.pred.posmean,
+                    Y.pred.posvar = Y.pred.posvar,
+                    Y.pred.samp = samp[, seq(
+                      from = 1, to = length(return.iters), by = thin), 
+                      drop = FALSE],
+                    minutes = (tock - tick) / 60)
+  } else {
+    results <- list(theta = keepers.theta,
+                    tau = keepers.tau,
+                    rho = keepers.rho,
+                    r = keepers.r,
+                    latent.posmean = latent.posmean,
+                    latent.posvar = latent.posvar,
+                    Y.pred.posmean = Y.pred.posmean,
+                    Y.pred.posvar = Y.pred.posvar,
+                    minutes = (tock - tick) / 60)
+  }
 
   return(results)}
